@@ -2,6 +2,7 @@ package com.example.reactorstudy
 
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
+import java.lang.RuntimeException
 
 class FluxTest {
 
@@ -73,15 +74,16 @@ class FluxTest {
     fun groupTest() {
         val flux = Flux.range(1, 20)
 
-        flux.groupBy { num ->
-            when {
-                num % 2 == 0 -> "Even"
-                else -> "Odd"
+        flux.groupBy { it % 2 }
+            .flatMap { group ->
+                group.collectList()
+                    .map { list -> Pair(group.key(), list) }
             }
-        }.subscribe { groupFlux ->
-            groupFlux.subscribe { print("$it ") }
-            println()
-        }
+            .subscribe { println("Key: ${it.first}, Values: ${it.second}") }
+        /**
+         * groupBy는 flux내의 값들을 주어진 조건에 따라 나누어 GroupedFlux<K, T>에 저장하게 된다.
+         * 위의 예시에서는 데이터를 짝수, 홀수로 나누어 각각 GroupedFlux<K, T>에 나누어 저장한 것을 확인할 수 있다.
+         */
     }
 
     @Test
@@ -89,6 +91,72 @@ class FluxTest {
         val flux = Flux.fromIterable(listOf(1, 2, 3, 4, 5))
 
         flux.map { i -> i + 10 }
-            .subscribe { data -> println(data) }
+            .subscribe { println(it) }
+        /**
+         * map은 flux 안에 있는 데이터들을 동기적인 작업을 통해 값을 변경해주는 동작을 한다.
+         */
+    }
+
+    @Test
+    fun flatMapTest() {
+        val flux = Flux.range(1, 10)
+
+        flux.flatMap { i ->
+            Flux.just(i + 10)
+        }.subscribe { println(it) }
+        /**
+         * flatMap은 flux안에 있는 element들을 비동기로 동작해 새로운 reactive stream을 만들어 반환한다.
+         * 비동기로 동작하여 다른 API 또는 Repository의 메서드를 호출할 때 적합하다
+         */
+    }
+
+    @Test
+    fun flatMapSequentialTest() {
+        val flux = Flux.range(1, 10)
+
+        flux.flatMapSequential { i ->
+            Flux.just("Element: $i")
+//                .delayElements(Duration.ofMillis(100))
+        }.subscribe { println(it) }
+        /**
+         * flatMap과 다르게 flatMapSequential는 동시에 작업을 처리하는 것이 아니라 순차적으로 작업한다.
+         *
+         */
+    }
+
+    @Test
+    fun doOnEachTest() {
+        val flux = Flux.just(1, 2, 3, 4, 5)
+            .concatWith(Flux.error(RuntimeException("에러 발생")))
+
+        flux.doOnEach { println(it) }
+            .subscribe()
+        /**
+         * sequence를 처리하는동안 doOnNext, doOnError, doOnComplete, doOnSubscribe, doOnRequest, doOnCancel가 실행된다.
+         * doOnEach에 동작을 지정하면 이러한 동작들이 동작할 때 항상 동작하게 된다.
+         */
+    }
+
+    @Test
+    fun doOnNextTest() {
+        val flux = Flux.just(1, 2, 3, 4, 5)
+
+        flux.doOnNext { println("Received: $it") }
+            .subscribe { println("Processed: $it") }
+        /**
+         * doOnNext는 sequence에서 OnNext메서드가 호출될 때, 부가적으로 동작할 내용들을 지정할 때 사용한다.
+         * 스트림을 수정하지 않고 내보낸 값에 대해 작업을 수행할 수 있기에 주로 로깅이나 디버깅을 목적으로 사용된다.
+         */
+    }
+
+    @Test
+    fun doOnCompleteTest() {
+        val flux = Flux.just(1, 2, 3, 4, 5)
+
+        flux.doOnComplete { println("Complete!") }
+            .subscribe { println("Processed: $it") }
+        /**
+         * doOnComplete는 complete메서드가 호출되었을 때 동작하게 된다.
+         */
     }
 }
