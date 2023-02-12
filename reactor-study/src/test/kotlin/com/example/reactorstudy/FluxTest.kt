@@ -2,7 +2,6 @@ package com.example.reactorstudy
 
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
-import java.lang.RuntimeException
 
 class FluxTest {
 
@@ -159,4 +158,62 @@ class FluxTest {
          * doOnComplete는 complete메서드가 호출되었을 때 동작하게 된다.
          */
     }
+
+    @Test
+    fun onErrorReturnTest() {
+        val flux = Flux.just(1, 2, 0, 4, 5)
+            .map { 10 / it }
+            .onErrorReturn(-1)
+
+        flux.subscribe({ println(it) },
+            { println("Error: $it") })
+        /**
+         * webClient와 같이 외부 서비스에 연동할 때 문제가 발생하였을 때 동작할 핸들러를 지정할 수 있다.
+         * onErrorReturn, onErrorResume, onErrorMap를 통해 새로운 반환값을 지정할 수도 있고, 새로운 동작, 또는 다른 flux로 변환하여 보낼 수 있다.
+         *
+         * 위의 예시에서는 각각의 flux의 element를 10으로 나누는데 0으로 나누어 에러가 발생할 경우 -1을 반환하는 것을 확인할 수 있다.(이후의 연산은 진행되지 않는다.)
+         */
+    }
+
+    @Test
+    fun onErrorResumeTest() {
+        val flux = Flux.just(1, 2, 0, 4, 5)
+            .map {
+                if (it == 0) {
+                    throw IllegalArgumentException("Cannot divide by zero")
+                }
+                10 / it
+            }
+            .onErrorResume { error ->
+                if (error is IllegalArgumentException) {
+                    Flux.just(-1)
+                } else {
+                    Flux.error(error)
+                }
+            }
+
+        flux.subscribe({ println(it) }, { println("Error: $it") })
+    }
+
+    @Test
+    fun onErrorMapTest() {
+        val flux = Flux.just(1, 2, 0, 4, 5)
+            .map {
+                if (it == 0) {
+                    throw IllegalArgumentException("Cannot divide by zero")
+                }
+                10 / it
+            }
+            .onErrorMap { error ->
+                if (error is IllegalArgumentException) {
+                    CustomException("Cannot divide by zero")
+                } else {
+                    error
+                }
+            }
+
+        flux.subscribe({ println(it) }, { println("Error: $it") })
+    }
 }
+
+class CustomException(s: String) : Throwable()
